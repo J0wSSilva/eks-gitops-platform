@@ -1,0 +1,62 @@
+# =============================================================================
+# RBAC - Staging Namespace
+# Desenvolvedores podem ver e debugar, mas não alterar workloads diretamente
+# Deploys são feitos SOMENTE via ArgoCD (GitOps enforcement)
+# =============================================================================
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: staging-view-debug
+  namespace: staging
+  labels:
+    app.kubernetes.io/part-of: eks-gitops-platform
+    rbac.authorization.k8s.io/environment: staging
+rules:
+  # Read-only em todos os workloads
+  - apiGroups: ['apps']
+    resources: ['deployments', 'replicasets', 'statefulsets', 'daemonsets']
+    verbs: ['get', 'list', 'watch']
+  # Pods: view + logs + port-forward (debug), mas sem exec
+  - apiGroups: ['']
+    resources: ['pods', 'pods/log', 'pods/portforward']
+    verbs: ['get', 'list', 'watch', 'create']
+  # Sem pods/exec em staging — força uso de logs e port-forward
+  # Services
+  - apiGroups: ['']
+    resources: ['services', 'endpoints']
+    verbs: ['get', 'list', 'watch']
+  - apiGroups: ['networking.k8s.io']
+    resources: ['ingresses']
+    verbs: ['get', 'list', 'watch']
+  # ConfigMaps (read only), Secrets (list only, sem ver conteúdo)
+  - apiGroups: ['']
+    resources: ['configmaps']
+    verbs: ['get', 'list', 'watch']
+  - apiGroups: ['']
+    resources: ['secrets']
+    verbs: ['list']
+  # HPA (view)
+  - apiGroups: ['autoscaling']
+    resources: ['horizontalpodautoscalers']
+    verbs: ['get', 'list', 'watch']
+  # Events
+  - apiGroups: ['']
+    resources: ['events']
+    verbs: ['get', 'list', 'watch']
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: staging-view-debug-binding
+  namespace: staging
+  labels:
+    app.kubernetes.io/part-of: eks-gitops-platform
+subjects:
+  - kind: Group
+    name: developers
+    apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: Role
+  name: staging-view-debug
+  apiGroup: rbac.authorization.k8s.io

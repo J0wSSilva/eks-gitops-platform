@@ -1,0 +1,38 @@
+services:
+  ministack:
+    image: ministackorg/ministack:latest
+    container_name: ministack
+    ports:
+      - '4566:4566'
+    environment:
+      - MINISTACK_REGION=us-east-1
+      - PERSIST_STATE=1
+      - STATE_DIR=/var/lib/ministack
+      - LAMBDA_EXECUTOR=docker
+      - DOCKER_NETWORK=eks-gitops-local_infra
+      - LOG_LEVEL=info
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ministack-data:/var/lib/ministack
+      - ./init-scripts:/docker-entrypoint-initaws.d
+    networks:
+      - infra
+    healthcheck:
+      test:
+        [
+          'CMD-SHELL',
+          'python -c "import urllib.request; urllib.request.urlopen(''http://localhost:4566/_ministack/health'')"',
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
+volumes:
+  ministack-data:
+
+networks:
+  infra:
+    name: eks-gitops-local_infra
+    driver: bridge

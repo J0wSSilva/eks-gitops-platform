@@ -1,0 +1,62 @@
+# =============================================================================
+# RBAC - Dev Namespace
+# Desenvolvedores têm acesso amplo em dev para iteração rápida
+# =============================================================================
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: dev-full-access
+  namespace: dev
+  labels:
+    app.kubernetes.io/part-of: eks-gitops-platform
+    rbac.authorization.k8s.io/environment: dev
+rules:
+  # Workloads: deploy, scale, restart
+  - apiGroups: ['apps']
+    resources: ['deployments', 'replicasets', 'statefulsets', 'daemonsets']
+    verbs: ['get', 'list', 'watch', 'create', 'update', 'patch', 'delete']
+  # Pods: logs, exec, port-forward (debug)
+  - apiGroups: ['']
+    resources: ['pods', 'pods/log', 'pods/exec', 'pods/portforward']
+    verbs: ['get', 'list', 'watch', 'create', 'delete']
+  # Services e Ingress
+  - apiGroups: ['']
+    resources: ['services', 'endpoints']
+    verbs: ['get', 'list', 'watch', 'create', 'update', 'patch', 'delete']
+  - apiGroups: ['networking.k8s.io']
+    resources: ['ingresses']
+    verbs: ['get', 'list', 'watch', 'create', 'update', 'patch', 'delete']
+  # ConfigMaps e Secrets (read/write em dev)
+  - apiGroups: ['']
+    resources: ['configmaps', 'secrets']
+    verbs: ['get', 'list', 'watch', 'create', 'update', 'patch', 'delete']
+  # HPA
+  - apiGroups: ['autoscaling']
+    resources: ['horizontalpodautoscalers']
+    verbs: ['get', 'list', 'watch', 'create', 'update', 'patch']
+  # Events (troubleshooting)
+  - apiGroups: ['']
+    resources: ['events']
+    verbs: ['get', 'list', 'watch']
+  # Jobs e CronJobs
+  - apiGroups: ['batch']
+    resources: ['jobs', 'cronjobs']
+    verbs: ['get', 'list', 'watch', 'create', 'update', 'patch', 'delete']
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: dev-full-access-binding
+  namespace: dev
+  labels:
+    app.kubernetes.io/part-of: eks-gitops-platform
+subjects:
+  # Grupo do IAM/SSO (mapeado via EKS Access Entry ou aws-auth)
+  - kind: Group
+    name: developers
+    apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: Role
+  name: dev-full-access
+  apiGroup: rbac.authorization.k8s.io

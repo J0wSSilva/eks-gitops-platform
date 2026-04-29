@@ -1,0 +1,107 @@
+# =============================================================================
+# RBAC - Prod Namespace
+# Máxima restrição: somente leitura. Nenhuma ação mutante.
+# Apenas platform-admins (SREs) têm acesso write via role separada.
+# =============================================================================
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: prod-readonly
+  namespace: prod
+  labels:
+    app.kubernetes.io/part-of: eks-gitops-platform
+    rbac.authorization.k8s.io/environment: prod
+rules:
+  # Read-only em workloads
+  - apiGroups: ['apps']
+    resources: ['deployments', 'replicasets', 'statefulsets', 'daemonsets']
+    verbs: ['get', 'list', 'watch']
+  # Pods: apenas view e logs (sem exec, sem port-forward)
+  - apiGroups: ['']
+    resources: ['pods', 'pods/log']
+    verbs: ['get', 'list', 'watch']
+  # Services (view)
+  - apiGroups: ['']
+    resources: ['services', 'endpoints']
+    verbs: ['get', 'list', 'watch']
+  - apiGroups: ['networking.k8s.io']
+    resources: ['ingresses']
+    verbs: ['get', 'list', 'watch']
+  # ConfigMaps (read), Secrets (list names only)
+  - apiGroups: ['']
+    resources: ['configmaps']
+    verbs: ['get', 'list', 'watch']
+  - apiGroups: ['']
+    resources: ['secrets']
+    verbs: ['list']
+  # Events
+  - apiGroups: ['']
+    resources: ['events']
+    verbs: ['get', 'list', 'watch']
+  # HPA
+  - apiGroups: ['autoscaling']
+    resources: ['horizontalpodautoscalers']
+    verbs: ['get', 'list', 'watch']
+---
+# Binding para desenvolvedores (read-only em prod)
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: prod-readonly-developers
+  namespace: prod
+  labels:
+    app.kubernetes.io/part-of: eks-gitops-platform
+subjects:
+  - kind: Group
+    name: developers
+    apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: Role
+  name: prod-readonly
+  apiGroup: rbac.authorization.k8s.io
+---
+# Role para SREs/Platform Engineers (acesso write em emergência)
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: prod-sre-access
+  namespace: prod
+  labels:
+    app.kubernetes.io/part-of: eks-gitops-platform
+    rbac.authorization.k8s.io/environment: prod
+rules:
+  - apiGroups: ['apps']
+    resources: ['deployments', 'replicasets', 'statefulsets']
+    verbs: ['get', 'list', 'watch', 'update', 'patch']
+  - apiGroups: ['']
+    resources: ['pods', 'pods/log', 'pods/exec', 'pods/portforward']
+    verbs: ['get', 'list', 'watch', 'create', 'delete']
+  - apiGroups: ['']
+    resources: ['configmaps', 'secrets']
+    verbs: ['get', 'list', 'watch', 'update', 'patch']
+  - apiGroups: ['']
+    resources: ['services']
+    verbs: ['get', 'list', 'watch', 'update', 'patch']
+  - apiGroups: ['autoscaling']
+    resources: ['horizontalpodautoscalers']
+    verbs: ['get', 'list', 'watch', 'update', 'patch']
+  - apiGroups: ['']
+    resources: ['events']
+    verbs: ['get', 'list', 'watch']
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: prod-sre-access-binding
+  namespace: prod
+  labels:
+    app.kubernetes.io/part-of: eks-gitops-platform
+subjects:
+  - kind: Group
+    name: platform-admins
+    apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: Role
+  name: prod-sre-access
+  apiGroup: rbac.authorization.k8s.io

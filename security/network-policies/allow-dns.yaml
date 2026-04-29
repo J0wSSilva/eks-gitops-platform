@@ -1,0 +1,87 @@
+# =============================================================================
+# Network Policy - Allow DNS
+# Permite que todos os pods resolvam DNS via CoreDNS (kube-system)
+# Sem isso, nenhum pod consegue resolver nomes de serviço
+# =============================================================================
+---
+# Dev
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-dns
+  namespace: dev
+  labels:
+    app.kubernetes.io/part-of: eks-gitops-platform
+    policy-type: baseline
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    # DNS via UDP e TCP (TCP para respostas grandes)
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+---
+# Staging
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-dns
+  namespace: staging
+  labels:
+    app.kubernetes.io/part-of: eks-gitops-platform
+    policy-type: baseline
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+---
+# Prod
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-dns
+  namespace: prod
+  labels:
+    app.kubernetes.io/part-of: eks-gitops-platform
+    policy-type: baseline
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53

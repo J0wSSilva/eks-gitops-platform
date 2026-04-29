@@ -1,0 +1,23 @@
+# =============================================================================
+# Kustomize Base
+# Lista todos os resources comuns. Overlays fazem patches sobre esta base.
+# =============================================================================
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Labels comuns aplicados a TODOS os recursos
+labels:
+  - pairs:
+      app.kubernetes.io/name: demo-app
+      app.kubernetes.io/instance: demo-app
+      app.kubernetes.io/part-of: eks-gitops-platform
+      app.kubernetes.io/managed-by: argocd
+    includeSelectors: false
+
+resources:
+  - serviceaccount.yaml
+  - configmap.yaml
+  - deployment.yaml
+  - service.yaml
+  - ingress.yaml
+  - hpa.yaml

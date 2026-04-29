@@ -1,0 +1,26 @@
+# =============================================================================
+# Service - ClusterIP
+# Expõe o app internamente. Ingress/ALB faz o roteamento externo.
+# =============================================================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: demo-app
+  annotations:
+    # Prometheus service discovery
+    prometheus.io/scrape: 'true'
+    prometheus.io/port: '9090'
+    prometheus.io/path: '/metrics'
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      protocol: TCP
+    - name: metrics
+      port: 9090
+      targetPort: metrics
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: demo-app

@@ -1,0 +1,51 @@
+# =============================================================================
+# Network Policy - Default Deny All
+# Aplica-se a TODOS os pods nos namespaces. Todo tráfego é negado por default.
+# Regras adicionais (allow-*) abrem apenas o necessário.
+# Princípio: Zero Trust Networking
+# =============================================================================
+---
+# Dev namespace
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: dev
+  labels:
+    app.kubernetes.io/part-of: eks-gitops-platform
+    policy-type: baseline
+spec:
+  podSelector: {} # Seleciona TODOS os pods
+  policyTypes:
+    - Ingress
+    - Egress
+---
+# Staging namespace
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: staging
+  labels:
+    app.kubernetes.io/part-of: eks-gitops-platform
+    policy-type: baseline
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+---
+# Prod namespace
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: prod
+  labels:
+    app.kubernetes.io/part-of: eks-gitops-platform
+    policy-type: baseline
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress

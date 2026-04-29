@@ -1,0 +1,256 @@
+# =============================================================================
+# ArgoCD Helm Values
+# Chart: argo/argo-cd (https://argoproj.github.io/argo-helm)
+# Version: ~> 6.x
+#
+# Instalação:
+#   helm repo add argo https://argoproj.github.io/argo-helm
+#   helm repo update
+#   kubectl apply -f namespace.yaml
+#   helm install argocd argo/argo-cd \
+#     --namespace argocd \
+#     --values values.yaml \
+#     --wait
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Global
+# -----------------------------------------------------------------------------
+global:
+  # Imagem padrão - pin version para reproducibilidade
+  image:
+    tag: 'v2.11.2'
+
+# -----------------------------------------------------------------------------
+# ArgoCD Server
+# -----------------------------------------------------------------------------
+server:
+  # Replicas para HA (2 em prod, 1 em dev)
+  replicas: 2
+
+  # Ingress para acesso externo via ALB
+  ingress:
+    enabled: true
+    ingressClassName: alb
+    annotations:
+      alb.ingress.kubernetes.io/scheme: internet-facing
+      alb.ingress.kubernetes.io/target-type: ip
+      alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS":443}]'
+      alb.ingress.kubernetes.io/certificate-arn: '' # Preencher com ARN do ACM certificate
+      alb.ingress.kubernetes.io/ssl-policy: ELBSecurityPolicy-TLS13-1-2-2021-06
+      alb.ingress.kubernetes.io/healthcheck-path: /healthz
+      alb.ingress.kubernetes.io/group.name: platform
+      # Security: WAF (preencha com ARN do WAFv2 WebACL)
+      alb.ingress.kubernetes.io/wafv2-acl-arn: '' # Preencher com ARN do WAFv2 ACL
+      # Security: bloqueia acesso de IPs não autorizados (ajuste conforme necessidade)
+      alb.ingress.kubernetes.io/inbound-cidrs: '' # Preencher com CIDRs da VPN/office
+      # Security headers
+      alb.ingress.kubernetes.io/actions.response-headers: |
+        {"type":"fixed-response","fixedResponseConfig":{"contentType":"text/plain","statusCode":"200","messageBody":"ok"}}
+    hosts:
+      - argocd.example.com # Trocar pelo domínio real
+    tls:
+      - secretName: argocd-tls
+        hosts:
+          - argocd.example.com
+
+  # Métricas para Prometheus
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+      namespace: argocd
+      additionalLabels:
+        release: kube-prometheus-stack
+
+  # Resources
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+  # Configuração extra
+  extraArgs:
+    - --insecure # Termina TLS no ALB, não no ArgoCD
+
+# -----------------------------------------------------------------------------
+# ArgoCD Repo Server
+# -----------------------------------------------------------------------------
+repoServer:
+  replicas: 2
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: '1'
+      memory: 1Gi
+
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+      additionalLabels:
+        release: kube-prometheus-stack
+
+# -----------------------------------------------------------------------------
+# ArgoCD Application Controller
+# -----------------------------------------------------------------------------
+controller:
+  replicas: 1 # Apenas 1 (leader election ativo)
+
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: '1'
+      memory: 1Gi
+
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+      additionalLabels:
+        release: kube-prometheus-stack
+
+  # Configurações de sync
+  args:
+    # Timeout de operação (default 3m pode ser pouco para clusters grandes)
+    operationProcessors: '25'
+    appResyncPeriod: '180' # Reconcilia a cada 3 min
+
+# -----------------------------------------------------------------------------
+# ArgoCD ApplicationSet Controller
+# -----------------------------------------------------------------------------
+applicationSet:
+  enabled: true
+  replicas: 2
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+# -----------------------------------------------------------------------------
+# Redis (cache)
+# -----------------------------------------------------------------------------
+redis:
+  enabled: true
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+
+# -----------------------------------------------------------------------------
+# Notifications (opcional - alertas de sync para Slack/Teams)
+# -----------------------------------------------------------------------------
+notifications:
+  enabled: true
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+
+  # Configurar triggers e templates para Slack
+  notifiers:
+    service.slack: |
+      token: $slack-token
+
+  triggers:
+    trigger.on-sync-succeeded: |
+      - when: app.status.sync.status == 'Synced'
+        send: [app-sync-succeeded]
+    trigger.on-sync-failed: |
+      - when: app.status.sync.status == 'Unknown'
+        send: [app-sync-failed]
+    trigger.on-health-degraded: |
+      - when: app.status.health.status == 'Degraded'
+        send: [app-health-degraded]
+
+  templates:
+    template.app-sync-succeeded: |
+      message: |
+        ✅ {{.app.metadata.name}} synced successfully
+        Revision: {{.app.status.sync.revision}}
+    template.app-sync-failed: |
+      message: |
+        ❌ {{.app.metadata.name}} sync failed
+        Revision: {{.app.status.sync.revision}}
+    template.app-health-degraded: |
+      message: |
+        ⚠️ {{.app.metadata.name}} is degraded
+
+# -----------------------------------------------------------------------------
+# Configs
+# -----------------------------------------------------------------------------
+configs:
+  # Repositórios conhecidos
+  repositories:
+    eks-gitops-platform:
+      url: https://github.com/J0wSSilva/eks-gitops-platform.git
+      name: eks-gitops-platform
+      type: git
+
+  # RBAC do ArgoCD (quem pode sync/deploy)
+  rbac:
+    policy.csv: |
+      # Admins podem tudo
+      p, role:admin, applications, *, */*, allow
+      p, role:admin, clusters, *, *, allow
+      p, role:admin, repositories, *, *, allow
+      p, role:admin, projects, *, *, allow
+
+      # Devs podem ver e sync em dev/staging, mas não em prod
+      p, role:developer, applications, get, */*, allow
+      p, role:developer, applications, sync, dev/*, allow
+      p, role:developer, applications, sync, staging/*, allow
+      p, role:developer, logs, get, */*, allow
+
+      # Viewers (readonly)
+      p, role:viewer, applications, get, */*, allow
+      p, role:viewer, logs, get, */*, allow
+
+      # Binding de grupos
+      g, platform-admins, role:admin
+      g, developers, role:developer
+      g, viewers, role:viewer
+    policy.default: role:viewer
+
+  params:
+    # Timeout de sync
+    timeout.reconciliation: 180s
+    # Habilita criação de namespace pelo ArgoCD
+    application.namespaces: '*'
+
+  # ConfigMap extra
+  cm:
+    # URL do ArgoCD (para links nos notifications)
+    url: https://argocd.example.com
+    # Habilita status badge
+    statusbadge.enabled: 'true'
+    # Health checks customizados para CRDs comuns
+    resource.customizations.health.argoproj.io_Application: |
+      hs = {}
+      hs.status = "Healthy"
+      if obj.status ~= nil then
+        if obj.status.health ~= nil then
+          hs.status = obj.status.health.status
+        end
+      end
+      return hs

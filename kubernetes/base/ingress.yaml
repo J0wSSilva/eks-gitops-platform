@@ -1,0 +1,38 @@
+# =============================================================================
+# Ingress - AWS ALB
+# Roteamento externo via ALB com TLS (cert-manager ou ACM)
+# =============================================================================
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: demo-app
+  annotations:
+    # AWS ALB Controller annotations
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS":443}]'
+    alb.ingress.kubernetes.io/ssl-redirect: '443'
+    alb.ingress.kubernetes.io/healthcheck-path: /health/ready
+    alb.ingress.kubernetes.io/healthcheck-interval-seconds: '15'
+    alb.ingress.kubernetes.io/healthy-threshold-count: '2'
+    alb.ingress.kubernetes.io/unhealthy-threshold-count: '3'
+    alb.ingress.kubernetes.io/group.name: platform
+    alb.ingress.kubernetes.io/ssl-policy: ELBSecurityPolicy-TLS13-1-2-2021-06
+    # Tags no ALB para cost allocation
+    alb.ingress.kubernetes.io/tags: 'Project=eks-gitops-platform,ManagedBy=argocd'
+spec:
+  ingressClassName: alb
+  rules:
+    - host: app.example.com # Sobrescrito por overlay
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: demo-app
+                port:
+                  name: http
+  tls:
+    - hosts:
+        - app.example.com

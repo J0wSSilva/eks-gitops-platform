@@ -1,0 +1,26 @@
+# =============================================================================
+# Prod Patch - Deployment
+# 3 replicas, resources altos, PodDisruptionBudget via topologySpread
+# =============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: demo-app
+spec:
+  replicas: 3
+  template:
+    spec:
+      containers:
+        - name: demo-app
+          resources:
+            requests:
+              cpu: 250m
+              memory: 256Mi
+            limits:
+              cpu: '1'
+              memory: 512Mi
+          env:
+            - name: ENVIRONMENT
+              value: 'prod'
+            - name: LOG_LEVEL
+              value: 'warn'

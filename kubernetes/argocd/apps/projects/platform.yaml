@@ -1,0 +1,87 @@
+# =============================================================================
+# ArgoCD AppProject - Platform
+# Define fronteiras de segurança: quais repos e namespaces são permitidos
+# =============================================================================
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: platform
+  namespace: argocd
+  # Proteção contra deleção acidental do projeto
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  description: 'EKS GitOps Platform - todos os workloads da plataforma'
+
+  # Repositórios fonte permitidos (whitelist)
+  sourceRepos:
+    - 'https://github.com/J0wSSilva/eks-gitops-platform.git'
+    - 'https://argoproj.github.io/argo-helm' # Para ArgoCD self-manage
+    - 'https://prometheus-community.github.io/helm-charts' # Para monitoring
+
+  # Destinos permitidos: quais clusters e namespaces este projeto pode deployar
+  destinations:
+    # Dev
+    - namespace: dev
+      server: https://kubernetes.default.svc
+    # Staging
+    - namespace: staging
+      server: https://kubernetes.default.svc
+    # Prod
+    - namespace: prod
+      server: https://kubernetes.default.svc
+    # ArgoCD (self-manage)
+    - namespace: argocd
+      server: https://kubernetes.default.svc
+    # Monitoring
+    - namespace: monitoring
+      server: https://kubernetes.default.svc
+    # External Secrets
+    - namespace: external-secrets
+      server: https://kubernetes.default.svc
+
+  # Tipos de recursos permitidos no cluster-level
+  clusterResourceWhitelist:
+    - group: ''
+      kind: Namespace
+    - group: rbac.authorization.k8s.io
+      kind: ClusterRole
+    - group: rbac.authorization.k8s.io
+      kind: ClusterRoleBinding
+    - group: networking.k8s.io
+      kind: IngressClass
+
+  # Recursos de namespace bloqueados (segurança)
+  namespaceResourceBlacklist:
+    - group: ''
+      kind: ResourceQuota # Gerenciado por platform admins, não por apps
+    - group: ''
+      kind: LimitRange # Idem
+
+  # Roles que podem gerenciar este projeto
+  roles:
+    - name: admin
+      description: 'Platform admins - full access'
+      policies:
+        - p, proj:platform:admin, applications, *, platform/*, allow
+        - p, proj:platform:admin, repositories, *, platform/*, allow
+      groups:
+        - platform-admins
+
+    - name: developer
+      description: 'Developers - sync dev/staging only'
+      policies:
+        - p, proj:platform:developer, applications, get, platform/*, allow
+        - p, proj:platform:developer, applications, sync, platform/*-dev, allow
+        - p, proj:platform:developer, applications, sync, platform/*-staging, allow
+      groups:
+        - developers
+
+  # Janelas de sync (opcional - restringe deploys em prod fora de horário)
+  # syncWindows:
+  #   - kind: deny
+  #     schedule: "0 0-6 * * *"  # Bloqueia sync em prod entre 00:00-06:00
+  #     duration: 6h
+  #     namespaces:
+  #       - prod
+  #     manualSync: true  # Permite sync manual mesmo na janela bloqueada

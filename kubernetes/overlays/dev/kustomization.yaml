@@ -1,0 +1,50 @@
+# =============================================================================
+# Dev Overlay
+# =============================================================================
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: dev
+
+resources:
+  - ../../base
+  - namespace.yaml
+
+# Patches estratégicos (merge com base)
+patches:
+  - path: patches/deployment-patch.yaml
+
+# Sobrescreve a imagem do container (CI/CD atualiza este valor)
+images:
+  - name: ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/eks-gitops-platform/demo-app
+    newTag: dev-latest
+
+# Labels adicionais para o ambiente
+commonLabels:
+  app.kubernetes.io/environment: dev
+
+# Sobrescreve o host do Ingress
+patches:
+  - path: patches/deployment-patch.yaml
+  - target:
+      kind: Ingress
+      name: demo-app
+    patch: |
+      - op: replace
+        path: /spec/rules/0/host
+        value: app-dev.example.com
+      - op: replace
+        path: /spec/tls/0/hosts/0
+        value: app-dev.example.com
+
+# HPA ajustado para dev
+  - target:
+      kind: HorizontalPodAutoscaler
+      name: demo-app
+    patch: |
+      - op: replace
+        path: /spec/minReplicas
+        value: 1
+      - op: replace
+        path: /spec/maxReplicas
+        value: 3

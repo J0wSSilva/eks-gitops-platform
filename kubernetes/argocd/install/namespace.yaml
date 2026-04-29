@@ -1,0 +1,14 @@
+# =============================================================================
+# ArgoCD Namespace
+# Criado separadamente para garantir que existe antes do Helm install
+# =============================================================================
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: argocd
+  labels:
+    app.kubernetes.io/part-of: argocd
+    app.kubernetes.io/managed-by: helm
+    # Pod Security Standards - privileged para ArgoCD (precisa de acesso ao cluster)
+    pod-security.kubernetes.io/enforce: baseline
+    pod-security.kubernetes.io/warn: restricted

@@ -1,0 +1,64 @@
+# =============================================================================
+# App of Apps - Root Application
+#
+# Esta é a Application "mãe" que gerencia todas as outras.
+# Ela aponta para a pasta kubernetes/argocd/apps/ e sincroniza
+# automaticamente qualquer novo arquivo .yaml que aparecer ali.
+#
+# Fluxo: Git push → ArgoCD detecta → cria/atualiza child Applications
+# =============================================================================
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: app-of-apps
+  namespace: argocd
+  # Finalizer garante cleanup das child apps ao deletar esta
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  annotations:
+    # Notificações para a app raiz
+    notifications.argoproj.io/subscribe.on-sync-succeeded.slack: platform-deploys
+    notifications.argoproj.io/subscribe.on-sync-failed.slack: platform-alerts
+spec:
+  project: platform
+
+  source:
+    repoURL: https://github.com/J0wSSilva/eks-gitops-platform.git
+    targetRevision: main
+    path: kubernetes/argocd/apps
+    # Exclui a si mesmo para evitar loop infinito
+    directory:
+      recurse: true
+      exclude: 'app-of-apps.yaml'
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+
+  # Política de sync automático com self-heal
+  syncPolicy:
+    automated:
+      # Sync automático quando detecta diff
+      selfHeal: true
+      # Poda recursos que foram removidos do Git
+      prune: true
+    syncOptions:
+      # Cria namespace se não existir
+      - CreateNamespace=true
+      # Aplica em server-side (melhor para CRDs grandes)
+      - ServerSideApply=true
+      # Retry em caso de conflito
+      - RespectIgnoreDifferences=true
+    retry:
+      limit: 3
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 1m
+
+  # Ignora diffs em campos gerenciados por controllers
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      jsonPointers:
+        - /spec/replicas # HPA gerencia replicas

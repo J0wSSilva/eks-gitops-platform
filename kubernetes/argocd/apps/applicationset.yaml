@@ -1,0 +1,108 @@
+# =============================================================================
+# ApplicationSet - Multi-Environment
+#
+# Gera automaticamente 1 Application por environment (dev, staging, prod)
+# a partir de um template único. Quando adicionar um novo env, basta
+# adicionar um item na lista "elements" abaixo.
+#
+# Resultado: 3 Applications criadas automaticamente:
+#   - demo-app-dev     → kubernetes/overlays/dev/
+#   - demo-app-staging → kubernetes/overlays/staging/
+#   - demo-app-prod    → kubernetes/overlays/prod/
+# =============================================================================
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: demo-app-environments
+  namespace: argocd
+spec:
+  # Gera apps a partir de uma lista estática de environments
+  generators:
+    - list:
+        elements:
+          - env: dev
+            namespace: dev
+            autoSync: 'true'
+            prune: 'true'
+          - env: staging
+            namespace: staging
+            autoSync: 'true'
+            prune: 'true'
+          - env: prod
+            namespace: prod
+            autoSync: 'false' # Prod: sync MANUAL obrigatório
+            prune: 'false' # Prod: nunca apaga recursos automaticamente
+
+  # Template da Application gerada para cada environment
+  template:
+    metadata:
+      name: 'demo-app-{{env}}'
+      namespace: argocd
+      labels:
+        app.kubernetes.io/name: demo-app
+        app.kubernetes.io/environment: '{{env}}'
+        app.kubernetes.io/managed-by: applicationset
+      annotations:
+        notifications.argoproj.io/subscribe.on-sync-succeeded.slack: 'platform-deploys'
+        notifications.argoproj.io/subscribe.on-health-degraded.slack: 'platform-alerts'
+    spec:
+      project: platform
+
+      source:
+        repoURL: https://github.com/J0wSSilva/eks-gitops-platform.git
+        targetRevision: main
+        path: 'kubernetes/overlays/{{env}}'
+
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: '{{namespace}}'
+
+      # Sync policy condicional por environment
+      syncPolicy:
+        automated:
+          selfHeal: true
+          prune: true
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true
+        retry:
+          limit: 3
+          backoff:
+            duration: 5s
+            factor: 2
+            maxDuration: 1m
+
+      # Health checks e rollback
+      revisionHistoryLimit: 10
+
+      ignoreDifferences:
+        - group: apps
+          kind: Deployment
+          jsonPointers:
+            - /spec/replicas
+
+  # Strategy: como lidar com apps que já existem
+  strategy:
+    type: RollingSync
+    rollingSync:
+      steps:
+        - matchExpressions:
+            - key: app.kubernetes.io/environment
+              operator: In
+              values:
+                - dev
+        - matchExpressions:
+            - key: app.kubernetes.io/environment
+              operator: In
+              values:
+                - staging
+        - matchExpressions:
+            - key: app.kubernetes.io/environment
+              operator: In
+              values:
+                - prod
+
+  # Preserva resources de apps deletadas do generator
+  preservedFields:
+    annotations:
+      - notifications.argoproj.io/*

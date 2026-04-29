@@ -1,0 +1,84 @@
+# =============================================================================
+# EKS GitOps Platform - .gitignore
+# =============================================================================
+
+# -- Terraform
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+*.tfplan.json
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraform.lock.hcl
+
+# -- Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+*.egg-info/
+.eggs/
+dist/
+build/
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+.mypy_cache/
+.ruff_cache/
+
+# -- Environment & Secrets (CRITICAL: never commit)
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+secrets/
+**/secrets.yaml
+**/secrets.yml
+
+# -- IDE & Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.settings/
+
+# -- OS
+.DS_Store
+Thumbs.db
+Desktop.ini
+*.tmp
+
+# -- Docker
+docker-compose.override.yml
+
+# -- Kubernetes
+kubeconfig
+*.kubeconfig
+
+# -- Node (if any tooling)
+node_modules/
+package-lock.json
+
+# -- Logs
+*.log
+logs/
+
+# -- Binaries
+*.exe
+*.dll
+*.dylib

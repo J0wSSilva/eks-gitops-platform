@@ -1,0 +1,41 @@
+# =============================================================================
+# Staging Overlay
+# =============================================================================
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: staging
+
+resources:
+  - ../../base
+  - namespace.yaml
+
+images:
+  - name: ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/eks-gitops-platform/demo-app
+    newTag: staging-latest
+
+commonLabels:
+  app.kubernetes.io/environment: staging
+
+patches:
+  - path: patches/deployment-patch.yaml
+  - target:
+      kind: Ingress
+      name: demo-app
+    patch: |
+      - op: replace
+        path: /spec/rules/0/host
+        value: app-staging.example.com
+      - op: replace
+        path: /spec/tls/0/hosts/0
+        value: app-staging.example.com
+  - target:
+      kind: HorizontalPodAutoscaler
+      name: demo-app
+    patch: |
+      - op: replace
+        path: /spec/minReplicas
+        value: 2
+      - op: replace
+        path: /spec/maxReplicas
+        value: 6

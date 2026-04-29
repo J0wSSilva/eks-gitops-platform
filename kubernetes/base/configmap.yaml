@@ -1,0 +1,14 @@
+# =============================================================================
+# ConfigMap - Configurações não-sensíveis do app
+# Overlays sobrescrevem valores por ambiente
+# =============================================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: demo-app-config
+data:
+  APP_NAME: 'demo-app'
+  LOG_LEVEL: 'info'
+  LOG_FORMAT: 'json'
+  METRICS_ENABLED: 'true'
+  METRICS_PORT: '9090'
